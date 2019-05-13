@@ -9,9 +9,9 @@ const connection = new Sequelize('db', 'user', 'pass', {
     host: 'localhost',
     dialect: 'sqlite',
     storage: 'db.sqlite',
-    define: {
-        freezeTableName: true
-    }
+    // define: {
+    //     freezeTableName: true
+    // }
 });
 
 
@@ -31,56 +31,29 @@ const User = connection.define('User', {
     }
 });
 
-app.get('/findOne',  (req, res) => {
-    User.findByPk('55')
-        .then(user => {
-            res.json(user);
-        })
-        .catch( error => {
-            console.log(error);
-            res.status(404).send(error);
-        });
+const Post = connection.define('Post', {
+    title: Sequelize.STRING,
+    content: Sequelize.TEXT
 });
 
-app.delete('/remove',  (req, res) => {
-    User.destroy({
-        where: { id: 55 }
-    })
-    .then(() => {
-        res.send('User successfully deleted');
-    })
-    .catch( error => {
-        console.log(error);
-        res.status(404).send(error);
-    });
+const Comment = connection.define('Comment', {
+    the_comment: Sequelize.STRING
 });
 
-app.put('/update',  (req, res) => {
-    User.update({
-        name: 'Michael Kean',
-        password: 'password'
-    },
-        {where: { id: 55}}
-    )
-    .then(rows => {
-        res.json(rows);
-    })
-    .catch( error => {
-        console.log(error);
-        res.status(404).send(error);
-    });
+const Project = connection.define('Project', {
+    title : Sequelize.STRING
 });
 
-app.get('/findAll', (req, res) => {
-   User.findAll({
-       where: {
-           name: {
-               [Op.like]: 'c%'
-           }
-       }
+
+app.get('/allposts', (req, res) => {
+   Post.findAll({
+       include: [{
+           model: User,
+           as: 'UserRef'
+       }]
    })
-   .then(user => {
-       res.json(user);
+   .then(posts => {
+       res.json(posts);
    })
    .catch( error => {
        console.log(error);
@@ -88,20 +61,80 @@ app.get('/findAll', (req, res) => {
    });
 });
 
-app.post('/post', (req, res) => {
-    const newUser = req.body.user;
-    User.create({
-        name: newUser.name,
-        email: newUser.email
-    })
-    .then(user => {
-        res.json(user);
-    })
-    .catch( error => {
-        console.log(error);
-        res.status(404).send(error);
-    })
+app.get('/getUserProjects', (req, res) => {
+   User.findAll({
+       attributes: ['name'],
+       include: [{
+           model: Project,
+           as: 'Tasks',
+           attributes: ['title']
+       }]
+   })
+   .then(output => {
+       res.json(output);
+   })
+   .catch( error => {
+       console.log(error);
+       res.status(404).send(error);
+   });
 });
+
+app.put('/addworker', (req, res) => {
+   Project.findByPk(2).then( project => { project.addWorkers(5); })
+   .then(() => {
+       res.send('User Added');
+   })
+   .catch( error => {
+       console.log(error);
+       res.status(404).send(error);
+   });
+});
+
+app.get('/singlepost', (req, res) => {
+   Post.findByPk('1', {
+       include: [{
+           model: Comment,
+           as: 'All_Comments',
+           attributes: ['the_comment']
+       },
+       {
+           model: User,
+           as: 'UserRef'
+       }]
+   })
+   .then(posts => {
+       res.json(posts);
+   })
+   .catch( error => {
+       console.log(error);
+       res.status(404).send(error);
+   });
+});
+
+
+// ONE TO ONE
+Post.belongsTo(User, {
+    as: 'UserRef',
+    foreignKey: 'userId'
+}); //puts foreignKey UserId in Post table
+
+// Same as belongsTo (puts the foreign key in the opposite table
+// User.hasOne(Post);
+
+//ONE TO MANY
+// User.hasMany(Post)
+Post.hasMany(Comment, {
+    as: 'All_Comments'
+}); //puts foreignKey postId in Comment table
+
+//MANY TO MANY (we use belong to many in BOTH models
+// User.belongsToMany(Post);
+// Post.belongsToMany(User);
+
+//Creates a UserProjects table with IDs for ProjectId and UserId
+User.belongsToMany(Project, {as: 'Tasks', through:'UserProjects'});
+Project.belongsToMany(User, {as: 'Workers', through: 'UserProjects'});
+
 
 connection
     .sync({
@@ -116,6 +149,52 @@ connection
     //         .catch(error => {
     //             console.error(error);
     //         })
+    // })
+    // .then(() => {
+    //     Post.create({
+    //         userId: 1,
+    //         title: 'First Post',
+    //         content: 'post content 1'
+    //     })
+    // })
+    // .then(() => {
+    //     Post.create({
+    //         userId: 1,
+    //         title: 'Second Post',
+    //         content: 'post content 2'
+    //     })
+    // })
+    // .then(() => {
+    //     Post.create({
+    //         userId: 2,
+    //         title: 'Third Post',
+    //         content: 'post content 3'
+    //     })
+    // })
+    // .then(() => {
+    //     Comment.create({
+    //         PostId: 1,
+    //         the_comment: 'my comment'
+    //     })
+    // })
+    // .then(() => {
+    //     Comment.create({
+    //         PostId: 1,
+    //         the_comment: 'my comment 2'
+    //     })
+    // })
+    // .then(() => {
+    //     Project.create({
+    //         title: 'project1'
+    //     })
+    //     .then( project => {
+    //         project.setWorkers([4, 5]);
+    //     });
+    // })
+    // .then(() => {
+    //     Project.create({
+    //         title: 'project2'
+    //     })
     // })
     .then(() => {
         console.log('Connection to db successfully established');
